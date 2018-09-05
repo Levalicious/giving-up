@@ -1,0 +1,14 @@
+syntax = "proto2";
+
+option java_package = "network.messageTypes";
+option java_outer_classname = "PeerProtos";
+
+message Peer {
+    required bytes IP = 1;
+    required uint32 port = 2;
+    required bytes id = 3;
+}
+
+message PeerList {
+    repeated Peer peers = 1;
+}

@@ -1,0 +1,17 @@
+syntax = "proto2";
+
+option java_package = "network.messageTypes";
+option java_outer_classname = "MessageProtos";
+
+message Message {
+    required uint32 setIndex = 1;
+    required uint32 setSize = 2;
+    optional bytes target = 3;
+    required uint32 messageType = 4;
+    required bytes data = 5;
+    required bytes r = 6;
+    required bytes s = 7;
+    required bytes v = 8;
+    required bytes messageHash = 9;
+    required uint32 hops = 10;
+}

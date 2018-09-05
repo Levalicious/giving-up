@@ -1,0 +1,117 @@
+package org.levk.UDP2Pv2;
+
+import java.awt.Color;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.net.UnknownHostException;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+
+import javax.imageio.ImageIO;
+
+import com.mxgraph.layout.mxCircleLayout;
+import com.mxgraph.model.mxGraphModel;
+import com.mxgraph.swing.mxGraphComponent;
+import com.mxgraph.util.mxCellRenderer;
+import com.mxgraph.util.mxConstants;
+import com.mxgraph.util.mxUtils;
+
+import org.jgrapht.Graph;
+import org.jgrapht.graph.builder.GraphTypeBuilder;
+import org.levk.UDP2Pv2.network.peerStorage.NoSpaceException;
+import org.levk.UDP2Pv2.network.peerStorage.Peer;
+import org.levk.UDP2Pv2.network.peerStorage.PeerSet;
+
+public class Start {
+    public static void main(String[] args) throws Exception {
+        BufferedImage bi;
+        Graph<PeerSet, Peer> graph = GraphTypeBuilder.undirected().vertexClass(PeerSet.class).edgeClass(Peer.class).allowingSelfLoops(true).allowingMultipleEdges(true).buildGraph();
+
+        List<PeerSet> peers = new ArrayList<>();
+
+        for (int i = 0; i < 5; i++) {
+            SecureRandom rand = new SecureRandom();
+            byte[] version = new byte[2];
+            byte[] ip = new byte[4];
+            byte[] port = new byte[2];
+
+            rand.nextBytes(version);
+            rand.nextBytes(ip);
+            rand.nextBytes(port);
+
+
+            PeerSet p = new PeerSet(new Peer(version, ip, port), 3);
+
+            peers.add(p);
+        }
+
+        peers.sort((o1, o2) -> o2.compareTo(o1));
+
+        for (PeerSet p : peers) {
+            graph.addVertex(p);
+        }
+
+        for (int i = 0; i < peers.size(); i++) {
+            if (i != 0) {
+                try {
+                    peers.get(i).add(peers.get(0).getSelf());
+
+                    peers.get(0).add(peers.get(i).getSelf());
+
+                    graph.addEdge(peers.get(i), peers.get(0));
+                } catch(NoSpaceException e) {
+                    peers.get(i).remove(peers.get(0).getSelf().getBucketAddress());
+                    peers.get(0).remove(peers.get(i).getSelf().getBucketAddress());
+                }
+            }
+
+            if (peers.get(0).getPeerCount() > 0) {
+                for (Peer p : peers.get(0).getPeers()) {
+                    PeerSet pr = identify(p.getBucketAddress(), peers);
+                    if (pr != null) {
+                        try {
+                            peers.get(i).add(p);
+                            
+                            pr.add(peers.get(i).getSelf());
+
+                            graph.addEdge(peers.get(i), pr);
+                        } catch (NoSpaceException n) {
+                            peers.get(i).remove(pr.getSelf().getBucketAddress());
+                            pr.remove(peers.get(i).getSelf().getBucketAddress());
+                        }
+                    }
+                }
+            }
+        }
+
+
+
+        JGraphXAdapter<PeerSet, Peer> jgxAdapter = new JGraphXAdapter<>(graph);
+        mxCircleLayout layout = new mxCircleLayout(jgxAdapter);
+        layout.execute(jgxAdapter.getDefaultParent());
+        mxGraphComponent comp = new mxGraphComponent(jgxAdapter);
+        mxGraphModel graphModel = (mxGraphModel) comp.getGraph().getModel();
+        Collection<Object> cells = graphModel.getCells().values();
+        mxUtils.setCellStyles(comp.getGraph().getModel(), cells.toArray(), mxConstants.STYLE_ENDARROW, mxConstants.NONE);
+
+        bi = mxCellRenderer.createBufferedImage(comp.getGraph(), null, 1, Color.WHITE, false, null);
+
+        File outpu = new File("out.png");
+
+        ImageIO.write(bi, "png", outpu);
+
+
+
+    }
+
+    public static PeerSet identify(byte[] nodeAddress, List<PeerSet> l) throws UnknownHostException {
+        for (PeerSet p : l) {
+            if (Arrays.equals(p.getSelf().getBucketAddress(), nodeAddress)) return p;
+        }
+
+        return null;
+    }
+}
